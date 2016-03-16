@@ -12,16 +12,16 @@ from SimpleCV import Image, Camera, Color
 from SimpleCV.DrawingLayer import DrawingLayer
 
 #------PID settings -------
-Kp = 0.2
+Kp = 0.1
 Ki = 0.1
-Kd = 0.0
+Kd = 0.1
 set_point = 200
 error = 0
 error_last = 0
 out_max = 255
 out_min = 0
-clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
-output_offset = 127
+output_offset = 0
+forward = True
 P = 0.0
 I = 0.0
 D = 0.0
@@ -30,7 +30,11 @@ output = 0
 t = time.time()
 last_time = t
 dt = 0.0
+
+combine = lambda pid, offset, forward: (offset + pid) if forward else (offset - pid)
+clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
 #--------------------------
+
 bg = False #true for black background, false for white
 
 #Functions for mapping image to filament width
@@ -132,9 +136,12 @@ while True:
     dt = t - last_time
     last_time = t
     I += Ki*error*dt
+    I = clamp(I, out_min, out_max)
     D = Kd*(error - error_last)/dt
-    output = output_offset + int(P + I + D)
+    output = combine(int(P + I + D), output_offset, forward)
     output = clamp(output, out_min, out_max)
+    print "error: " + str(error)
+    print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
     print "output: " + str(output)
     print "-------------"
 
