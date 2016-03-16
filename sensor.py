@@ -12,10 +12,10 @@ from SimpleCV import Image, Camera, Color
 from SimpleCV.DrawingLayer import DrawingLayer
 
 #------PID settings -------
-Kp = 1.0
-Ki = 0.0
+Kp = 0.2
+Ki = 0.1
 Kd = 0.0
-set_point = 220
+set_point = 200
 error = 0
 error_last = 0
 out_max = 255
@@ -31,9 +31,10 @@ t = time.time()
 last_time = t
 dt = 0.0
 #--------------------------
+bg = False #true for black background, false for white
 
 #Functions for mapping image to filament width
-pixel_threshold = 400
+pixel_threshold = 200
 
 #Can replace with a more complex function of img if necessary
 def getXSection(img):
@@ -46,22 +47,24 @@ def getXSection(img):
     return xSection
 
 #Can replace with a more complex function of x-section if necessary
-def getWidth(xSection, pixel_threshold):
-    dark_pixels = 0
+def getWidth(xSection, pixel_threshold, bg):
+    inside_pixels = 0
     upper_edge = 0
     lower_edge = 0
-    dark = False
+    inside = False
+    comp = lambda x, y, bg: (x > y) if bg else (x < y)
     for i, p in enumerate(xSection):
-        if p < pixel_threshold:
-            dark_pixels += 1
-            if not dark:
+        if comp(p, pixel_threshold, bg):
+            inside_pixels += 1
+            if not inside:
                 upper_edge = i
-                dark = True
+                inside = True
         else:
-            if dark:
+            if inside:
                 lower_edge = i
-                dark = False
-    return (dark_pixels, upper_edge, lower_edge)
+                inside = False
+
+    return (inside_pixels, upper_edge, lower_edge)
 
 #Serial functions
 def sendMessage(serial_connection, message):
@@ -102,7 +105,7 @@ logger.debug("Serial initialised to port: %s \n" % (port,))
 while True:
     img = cam.getImage()
     xSection = getXSection(img)
-    width_data = getWidth(xSection, pixel_threshold)
+    width_data = getWidth(xSection, pixel_threshold, bg)
     width = width_data[0]
 
     upper_edge = width_data[1]
@@ -130,7 +133,7 @@ while True:
     last_time = t
     I += Ki*error*dt
     D = Kd*(error - error_last)/dt
-    output = output_offset - int(P + I + D)
+    output = output_offset + int(P + I + D)
     output = clamp(output, out_min, out_max)
     print "output: " + str(output)
     print "-------------"
