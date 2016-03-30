@@ -12,32 +12,22 @@ int puller_speed = 125;
 
 void setup ()
 {
-  Serial.begin (9600);
+  Serial.begin (115200);
   while(!Serial);
-  Serial.setTimeout(10);
+  Serial.setTimeout(1);
   pinMode(motor_spoolerPin, OUTPUT);
   InitTimersSafe();
   SetPinFrequencySafe(9, 1000);
+  analogWrite(motor_spoolerPin,puller_speed);
 }
 
 void loop ()
 {
-  serial_check();
-  pull_control();       //Go to the spool_control function for auto control
-
-}
-  
-   
-void serial_check()
-{
   if(Serial.available())
   {
-   puller_speed = Serial.parseInt();   
+   puller_speed = Serial.parseInt();  
+   Serial.flush(); 
   }
-}
-   
-void pull_control()
-{
   analogWrite(motor_spoolerPin,puller_speed);   //Set the spool speed to the PID result
 }
 

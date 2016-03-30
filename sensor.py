@@ -16,7 +16,7 @@ from SimpleCV.DrawingLayer import DrawingLayer
 Kp = 0.1
 Ki = 0.1
 Kd = 0.001
-set_point = 325
+set_point = 262
 error = 0
 error_last = 0
 out_max = 255
@@ -31,13 +31,15 @@ output = 0
 t = time.time()
 last_time = t
 dt = 0.0
+output_rate = 1.0 #capture/output rate
+last_out = time.time()
 
 combine = lambda pid, offset, forward: (offset + pid) if forward else (offset - pid)
 clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
 #--------------------------
 
 bg = False #true for black background, false for white
-ARDUINO = False #False if testing microscope without arduino
+ARDUINO = True #False if testing microscope without arduino
 
 #Functions for mapping image to filament width
 pixel_threshold = 200
@@ -93,8 +95,8 @@ def get_message(serial_connection, timeout = 10): #timeout in seconds
 
 # Set up camera and serial connection
 prop_map = {
-    "width": 640,
-    "height": 480,
+#    "width": 640,
+#    "height": 480,
     "brightness": 0,
     "contrast": 1,
     "gain": 0,
@@ -116,7 +118,7 @@ if ARDUINO:
         logger.error("Could not find serial port for pinch roller arduino: %s" % (port,))
         raise Exception(port + " does not exist!")
     try:
-        connection = serial.Serial(port, 9600, timeout=None) # serial port which blocks forever on read
+        connection = serial.Serial(port, 115200, timeout=None) # serial port which blocks forever on read
     except:
         logger.exception("Error opening serial port for pinch roller arduino: %s" % (port,))
         raise
@@ -124,44 +126,56 @@ if ARDUINO:
 
 # The main loop
 while True:
-    img = cam.getImage()
-    xSection = getXSection(img)
-    width_data = getWidth(xSection, pixel_threshold, bg)
-    width = width_data[0]
+    try:
+        img = cam.getImage()
+        xSection = getXSection(img)
+        width_data = getWidth(xSection, pixel_threshold, bg)
+        width = width_data[0]
 
-    upper_edge = width_data[1]
-    lower_edge = width_data[2]
+        upper_edge = width_data[1]
+        lower_edge = width_data[2]
 
-    upper_line = DrawingLayer((img.width, img.height))
-    lower_line = DrawingLayer((img.width, img.height))
-    x_mid_line = DrawingLayer((img.width, img.height))
+        upper_line = DrawingLayer((img.width, img.height))
+        lower_line = DrawingLayer((img.width, img.height))
+        x_mid_line = DrawingLayer((img.width, img.height))
 
-    upper_line.line((0,upper_edge), (img.width, upper_edge), alpha=128, width=1, color=Color.RED)
-    lower_line.line((0,lower_edge), (img.width, lower_edge), alpha=128, width=1, color=Color.RED)
-    x_mid_line.line((img.width/2,0), (img.width/2, img.height), alpha=128, width=1, color=Color.RED)
+        upper_line.line((0,upper_edge), (img.width, upper_edge), alpha=128, width=1, color=Color.RED)
+        lower_line.line((0,lower_edge), (img.width, lower_edge), alpha=128, width=1, color=Color.RED)
+        x_mid_line.line((img.width/2,0), (img.width/2, img.height), alpha=128, width=1, color=Color.RED)
 
-    img.addDrawingLayer(upper_line)
-    img.addDrawingLayer(lower_line)
-    img.addDrawingLayer(x_mid_line)
+        img.addDrawingLayer(upper_line)
+        img.addDrawingLayer(lower_line)
+        img.addDrawingLayer(x_mid_line)
 
-    print "width: " + str(width)
+        img.show()
 
-    #PID calculations
-    error = width - set_point
-    P = Kp*error
-    t = time.time()
-    dt = t - last_time
-    last_time = t
-    I += Ki*error*dt
-    I = clamp(I, out_min, out_max)
-    D = Kd*(error - error_last)/dt
-    output = combine(int(P + I + D), output_offset, forward)
-    output = clamp(output, out_min, out_max)
-    print "error: " + str(error)
-    print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
-    print "output: " + str(output)
-    print "-------------"
+        #PID calculations
+        error = width - set_point
+        P = Kp*error
+        t = time.time()
+        dt = t - last_time
+        last_time = t
+        I += Ki*error*dt
+        I = clamp(I, -out_max, out_max)
+        D = Kd*(error - error_last)/dt
+        error_last = error
+        output = combine(int(P + I + D), output_offset, forward)
+        output = clamp(output, out_min, out_max)
+
+        if ARDUINO:
+            if (t - last_out) > output_rate:
+                sendMessage(connection, str(output))
+                last_out = t
+
+        print "width: " + str(width)
+        print "set point: " + str(set_point)
+        print "error: " + str(error)
+        print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
+        print "output: " + str(output)
+        print "-------------"
     
-    if ARDUINO:
-        sendMessage(connection, str(output))
-    img.show()
+       
+    except (KeyboardInterrupt, SystemExit):
+        sendMessage(connection, str(0))
+        connection.close()
+        raise
