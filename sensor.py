@@ -11,16 +11,17 @@ import logging
 from SimpleCV import Image, Camera, Color
 from SimpleCV.DrawingLayer import DrawingLayer
 
+
 #------PID settings -------
 Kp = 0.1
 Ki = 0.1
-Kd = 0.1
-set_point = 200
+Kd = 0.001
+set_point = 325
 error = 0
 error_last = 0
 out_max = 255
 out_min = 0
-output_offset = 0
+output_offset = 125 #just until we write a mode for pulling through at start
 forward = True
 P = 0.0
 I = 0.0
@@ -36,6 +37,7 @@ clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
 #--------------------------
 
 bg = False #true for black background, false for white
+ARDUINO = False #False if testing microscope without arduino
 
 #Functions for mapping image to filament width
 pixel_threshold = 200
@@ -90,20 +92,35 @@ def get_message(serial_connection, timeout = 10): #timeout in seconds
     return received_line
 
 # Set up camera and serial connection
-cam = Camera()
+prop_map = {
+    "width": 640,
+    "height": 480,
+    "brightness": 0,
+    "contrast": 1,
+    "gain": 0,
+    "hue": 0,
+    "saturation": 0,
+#            "exposure": 1, #exposure not supported for this camera/system
+}
+
+cam = Camera(-1,prop_map)
+print cam.getAllProperties()
+
+#cam = Camera()
 logger = logging.getLogger(__name__)
-port = "/dev/tty*USB*"
-try:
-    port = glob.glob(port)[0]
-except IndexError:
-    logger.error("Could not find serial port for pinch roller arduino: %s" % (port,))
-    raise Exception(port + " does not exist!")
-try:
-    connection = serial.Serial(port, 9600, timeout=None) # serial port which blocks forever on read
-except:
-    logger.exception("Error opening serial port for pinch roller arduino: %s" % (port,))
-    raise
-logger.debug("Serial initialised to port: %s \n" % (port,))
+if ARDUINO:
+    port = "/dev/tty*ACM*"
+    try:
+        port = glob.glob(port)[0]
+    except IndexError:
+        logger.error("Could not find serial port for pinch roller arduino: %s" % (port,))
+        raise Exception(port + " does not exist!")
+    try:
+        connection = serial.Serial(port, 9600, timeout=None) # serial port which blocks forever on read
+    except:
+        logger.exception("Error opening serial port for pinch roller arduino: %s" % (port,))
+        raise
+    logger.debug("Serial initialised to port: %s \n" % (port,))
 
 # The main loop
 while True:
@@ -144,6 +161,7 @@ while True:
     print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
     print "output: " + str(output)
     print "-------------"
-
-    sendMessage(connection, str(output))
+    
+    if ARDUINO:
+        sendMessage(connection, str(output))
     img.show()

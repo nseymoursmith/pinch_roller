@@ -1,8 +1,10 @@
 //Pinch roller motor driver by N. Seymour-Smith
 //This version offloads feedback calculations to the microscope computer
 
+#include <PWM.h>
+
 //Digital Pins
-int motor_spoolerPin = 5;     //PWM pin for spooler motor
+int motor_spoolerPin = 9;     //PWM pin for spooler motor
 
 //Variables for puller speed control
 int puller_speed = 125;
@@ -14,6 +16,8 @@ void setup ()
   while(!Serial);
   Serial.setTimeout(10);
   pinMode(motor_spoolerPin, OUTPUT);
+  InitTimersSafe();
+  SetPinFrequencySafe(9, 1000);
 }
 
 void loop ()
