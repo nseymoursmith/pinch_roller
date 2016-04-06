@@ -39,10 +39,20 @@ clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
 #--------------------------
 
 bg = False #true for black background, false for white
-ARDUINO = True #False if testing microscope without arduino
+ARDUINO = False #False if testing microscope without arduino
 
 #Functions for mapping image to filament width
-pixel_threshold = 200
+pixel_threshold = 300
+
+# Make a function that does a half and half image.
+def halfsies(left,right): 
+    result = left
+    # crop the right image to be just the right side.
+    crop   = right.crop(right.width/2.0,0,right.width/2.0,right.height)
+    # now paste the crop on the left image.
+    result = result.blit(crop,(left.width/2,0))
+    # return the results.
+    return result
 
 #Can replace with a more complex function of img if necessary
 def getXSection(img):
@@ -56,23 +66,12 @@ def getXSection(img):
 
 #Can replace with a more complex function of x-section if necessary
 def getWidth(xSection, pixel_threshold, bg):
-    inside_pixels = 0
-    upper_edge = 0
-    lower_edge = 0
-    inside = False
-    comp = lambda x, y, bg: (x > y) if bg else (x < y)
+    edges = []
     for i, p in enumerate(xSection):
-        if comp(p, pixel_threshold, bg):
-            inside_pixels += 1
-            if not inside:
-                upper_edge = i
-                inside = True
-        else:
-            if inside:
-                lower_edge = i
-                inside = False
-
-    return (inside_pixels, upper_edge, lower_edge)
+        if p > pixel_threshold:
+            edges.append(i)
+    width = max(edges) - min(edges)
+    return (width, min(edges), max(edges))
 
 #Serial functions
 def sendMessage(serial_connection, message):
@@ -97,9 +96,9 @@ def get_message(serial_connection, timeout = 10): #timeout in seconds
 prop_map = {
 #    "width": 640,
 #    "height": 480,
-    "brightness": 0,
-    "contrast": 1,
-    "gain": 0,
+    "brightness": 0.1,
+    "contrast": 0.9,
+    "gain": 0.1,
     "hue": 0,
     "saturation": 0,
 #            "exposure": 1, #exposure not supported for this camera/system
@@ -128,7 +127,10 @@ if ARDUINO:
 while True:
     try:
         img = cam.getImage()
-        xSection = getXSection(img)
+        output = img.edges(t1=pixel_threshold)
+        result = halfsies(img,output)
+
+        xSection = getXSection(output)
         width_data = getWidth(xSection, pixel_threshold, bg)
         width = width_data[0]
 
@@ -143,11 +145,11 @@ while True:
         lower_line.line((0,lower_edge), (img.width, lower_edge), alpha=128, width=1, color=Color.RED)
         x_mid_line.line((img.width/2,0), (img.width/2, img.height), alpha=128, width=1, color=Color.RED)
 
-        img.addDrawingLayer(upper_line)
-        img.addDrawingLayer(lower_line)
-        img.addDrawingLayer(x_mid_line)
+        result.addDrawingLayer(upper_line)
+        result.addDrawingLayer(lower_line)
+        result.addDrawingLayer(x_mid_line)
 
-        img.show()
+        result.show()
 
         #PID calculations
         error = width - set_point
@@ -176,6 +178,7 @@ while True:
     
        
     except (KeyboardInterrupt, SystemExit):
-        sendMessage(connection, str(0))
-        connection.close()
+        if ARDUINO:
+            sendMessage(connection, str(0))
+            connection.close()
         raise
