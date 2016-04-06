@@ -8,6 +8,7 @@ import serial
 import glob
 import time
 import logging
+from numpy import polyfit
 from SimpleCV import Image, Camera, Color
 from SimpleCV.DrawingLayer import DrawingLayer
 
@@ -42,7 +43,7 @@ bg = False #true for black background, false for white
 ARDUINO = False #False if testing microscope without arduino
 
 #Functions for mapping image to filament width
-pixel_threshold = 300
+pixel_threshold = 30
 
 # Make a function that does a half and half image.
 def halfsies(left,right): 
@@ -55,12 +56,12 @@ def halfsies(left,right):
     return result
 
 #Can replace with a more complex function of img if necessary
-def getXSection(img):
+def getXSection(img, x_posn):
     width = img.width
     height = img.height
     xSection = []
     for y in range(height):
-        current_pixel = img.getPixel(width/2,y)
+        current_pixel = img.getPixel(x_posn,y)
         xSection.append(sum(current_pixel))
     return xSection
 
@@ -130,7 +131,7 @@ while True:
         output = img.edges(t1=pixel_threshold)
         result = halfsies(img,output)
 
-        xSection = getXSection(output)
+        xSection = getXSection(output,img.width/2)
         width_data = getWidth(xSection, pixel_threshold, bg)
         width = width_data[0]
 
