@@ -8,8 +8,10 @@ import serial
 import glob
 import time
 import logging
-from SimpleCV import Image, Camera, Color
+import picamera
+from SimpleCV import Image, Color
 from SimpleCV.DrawingLayer import DrawingLayer
+import subprocess
 
 
 #------PID settings -------
@@ -39,7 +41,7 @@ clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
 #--------------------------
 
 bg = False #true for black background, false for white
-ARDUINO = True #False if testing microscope without arduino
+ARDUINO = False #False if testing microscope without arduino
 
 #Functions for mapping image to filament width
 pixel_threshold = 200
@@ -105,8 +107,9 @@ prop_map = {
 #            "exposure": 1, #exposure not supported for this camera/system
 }
 
-cam = Camera(-1,prop_map)
-print cam.getAllProperties()
+#cam = Camera(-1,prop_map)
+#print cam.getAllProperties()
+cam = picamera.PiCamera()
 
 #cam = Camera()
 logger = logging.getLogger(__name__)
@@ -127,7 +130,10 @@ if ARDUINO:
 # The main loop
 while True:
     try:
-        img = cam.getImage()
+#	subprocess.call("raspistill -n -t 0 -w %s -h %s -o image.bmp" % (640, 480), shell=True)
+	cam.capture('image.jpg')
+        img = Image("image.jpg")
+        img.show()
         xSection = getXSection(img)
         width_data = getWidth(xSection, pixel_threshold, bg)
         width = width_data[0]
@@ -176,6 +182,7 @@ while True:
     
        
     except (KeyboardInterrupt, SystemExit):
-        sendMessage(connection, str(0))
-        connection.close()
+	if ARDUINO:
+  		sendMessage(connection, str(0))
+        	connection.close()
         raise
