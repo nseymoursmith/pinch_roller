@@ -109,9 +109,9 @@ prop_map = {
 
 if PI_CAM:
     import picamera
-    stream = io.BytesIO()
+    from picamera import array as parray
     cam = picamera.PiCamera()
-    cam.start_preview()
+    cam.resolution = (640,480)
 else:
     cam = Camera(-1,prop_map)
 
@@ -136,8 +136,10 @@ while True:
     try:
         width = 0
         if PI_CAM:
-            cam.capture(stream, 'jpeg')
-            img = Image(stream) #test!
+#            cam.capture(stream,'jpeg', use_video_port=True)
+	    with parray.PiRGBArray(cam) as output:
+                cam.capture(output, 'rgb', use_video_port=True)
+                img = Image(output.array)
         else:
             img = cam.getImage()
 
@@ -216,8 +218,8 @@ while True:
         I = clamp(I, -out_max, out_max)
         D = Kd*(error - error_last)/dt
         error_last = error
-        output = combine(int(P + I + D), output_offset, forward)
-        output = clamp(output, out_min, out_max)
+#        output = combine(int(P + I + D), output_offset, forward)
+#        output = clamp(output, out_min, out_max)
 
         if ARDUINO:
             if (t - last_out) > output_rate:
@@ -228,7 +230,7 @@ while True:
         print "set point: " + str(set_point)
         print "error: " + str(error)
         print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
-        print "output: " + str(output)
+#        print "output: " + str(output)
         print "-------------"
     
        
