@@ -161,7 +161,7 @@ while True:
         #calculate width of filament
         width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
 
-        #Draw the fit lines and intersect markers
+        #Draw the fit lines and intersect markers 
         upper_layer = DrawingLayer((img.width, img.height))
         lower_layer = DrawingLayer((img.width, img.height))
         x_mid_layer = DrawingLayer((img.width, img.height))
