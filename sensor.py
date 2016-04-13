@@ -112,6 +112,24 @@ if PI_CAM:
     from picamera import array as parray
     cam = picamera.PiCamera()
     cam.resolution = (640,480)
+    cam.sharpness = 0
+    cam.contrast = 100
+    cam.brightness = 75
+    cam.saturation = -100
+    cam.iso = 100
+#    cam.video_stabilization = False
+    cam.exposure_compensation = 0
+    #cam.exposure_mode = 'off'
+    cam.shutter_speed = 300
+#    cam.meter_mode = 'average'
+#    cam.awb_mode = 'off'
+#    cam.image_effect = 'none'
+#    cam.color_effects = None
+#    cam.rotation = 90
+#    cam.hflip = False
+#    cam.vflip = False
+    cam.crop = (0.49, 0.49, 0.51, 0.51)
+
 else:
     cam = Camera(-1,prop_map)
 
