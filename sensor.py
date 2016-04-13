@@ -8,10 +8,16 @@ import serial
 import glob
 import time
 import logging
+import io
 from numpy import polyfit
 from SimpleCV import Image, Camera, Color
 from SimpleCV.DrawingLayer import DrawingLayer
 
+
+#General settings
+PI_CAM = True #If using raspberry picam
+ARDUINO = False #False if testing microscope without arduino
+pixel_threshold = 30
 
 #------PID settings -------
 Kp = 0.1
@@ -39,11 +45,8 @@ combine = lambda pid, offset, forward: (offset + pid) if forward else (offset - 
 clamp = lambda n, n_min, n_max: max(min(n_max, n), n_min)
 #--------------------------
 
-bg = False #true for black background, false for white
-ARDUINO = False #False if testing microscope without arduino
 
 #Functions for mapping image to filament width
-pixel_threshold = 30
 
 # Make a function that does a half and half image.
 def halfsies(left,right): 
@@ -104,8 +107,13 @@ prop_map = {
 #            "exposure": 1, #exposure not supported for this camera/system
 }
 
-cam = Camera(-1,prop_map)
-print cam.getAllProperties()
+if PI_CAM:
+    import picamera
+    stream = io.BytesIO()
+    cam = picamera.PiCamera()
+    cam.start_preview()
+else:
+    cam = Camera(-1,prop_map)
 
 #cam = Camera()
 logger = logging.getLogger(__name__)
@@ -126,7 +134,13 @@ if ARDUINO:
 # The main loop
 while True:
     try:
-        img = cam.getImage()
+        width = 0
+        if PI_CAM:
+            cam.capture(stream, 'jpeg')
+            img = Image(stream) #test!
+        else:
+            img = cam.getImage()
+
         #edge detect
         output = img.edges(t1=pixel_threshold, t2=4*pixel_threshold)
 
@@ -146,45 +160,49 @@ while True:
                 lower_edge.append(edge_data[1])
 
         #fit the edge data
-        upper_line = polyfit(range(0,len(upper_edge)), upper_edge, 1)
-        lower_line = polyfit(range(0,len(lower_edge)), lower_edge, 1)
-        #find the filament cross section
-        xs_slope = -2/(upper_line[0] + lower_line[0])
-        xs_offset = img.height/2 - xs_slope*img.width/2
+        try:
+            upper_line = polyfit(range(0,len(upper_edge)), upper_edge, 1)
+            lower_line = polyfit(range(0,len(lower_edge)), lower_edge, 1)
 
-        #calculate the points of intersection of edges and filament cross section
-        upper_intersect_x = (upper_line[1] - xs_offset)/(xs_slope - upper_line[0])
-        upper_intersect_y = xs_slope*upper_intersect_x + xs_offset
-        lower_intersect_x = (lower_line[1] - xs_offset)/(xs_slope - lower_line[0])
-        lower_intersect_y = xs_slope*lower_intersect_x + xs_offset
+            #calculate the filament cross section
+            xs_slope = -2/(upper_line[0] + lower_line[0])
+            xs_offset = img.height/2 - xs_slope*img.width/2
 
-        #calculate width of filament
-        width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
+            #calculate the points of intersection of edges and filament cross section
+            upper_intersect_x = (upper_line[1] - xs_offset)/(xs_slope - upper_line[0])
+            upper_intersect_y = xs_slope*upper_intersect_x + xs_offset
+            lower_intersect_x = (lower_line[1] - xs_offset)/(xs_slope - lower_line[0])
+            lower_intersect_y = xs_slope*lower_intersect_x + xs_offset
 
-        #Draw the fit lines and intersect markers 
-        upper_layer = DrawingLayer((img.width, img.height))
-        lower_layer = DrawingLayer((img.width, img.height))
-        x_mid_layer = DrawingLayer((img.width, img.height))
+            #calculate width of filament
+            width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
 
-        upper_start = upper_line[1]
-        upper_stop = upper_line[0]*img.width + upper_line[1] 
-        lower_start = lower_line[1]
-        lower_stop = lower_line[0]*img.width + lower_line[1] 
-        xSect_stop = xs_slope*img.width + xs_offset
+            #Draw the fit lines and intersect markers 
+            upper_layer = DrawingLayer((img.width, img.height))
+            lower_layer = DrawingLayer((img.width, img.height))
+            x_mid_layer = DrawingLayer((img.width, img.height))
 
-        upper_layer.line((0,upper_start), (img.width, upper_stop), alpha=128, width=1, color=Color.RED)
-        lower_layer.line((0,lower_start), (img.width, lower_stop), alpha=128, width=1, color=Color.RED)
-        x_mid_layer.line((0, xs_offset), (img.width, xSect_stop), alpha=128, width=1, color=Color.RED)
+            upper_start = upper_line[1]
+            upper_stop = upper_line[0]*img.width + upper_line[1] 
+            lower_start = lower_line[1]
+            lower_stop = lower_line[0]*img.width + lower_line[1] 
+            xSect_stop = xs_slope*img.width + xs_offset
 
-        upper_marker = (int(upper_intersect_x),int(upper_intersect_y))
-        lower_marker = (int(lower_intersect_x),int(lower_intersect_y))
-        r = 10
-        x_mid_layer.circle(upper_marker, r, alpha=128, filled=True, color=Color.RED)
-        x_mid_layer.circle(lower_marker, r, alpha=128, filled=True, color=Color.RED)
+            upper_layer.line((0,upper_start), (img.width, upper_stop), alpha=128, width=1, color=Color.RED)
+            lower_layer.line((0,lower_start), (img.width, lower_stop), alpha=128, width=1, color=Color.RED)
+            x_mid_layer.line((0, xs_offset), (img.width, xSect_stop), alpha=128, width=1, color=Color.RED)
 
-        result.addDrawingLayer(upper_layer)
-        result.addDrawingLayer(lower_layer)
-        result.addDrawingLayer(x_mid_layer)
+            upper_marker = (int(upper_intersect_x),int(upper_intersect_y))
+            lower_marker = (int(lower_intersect_x),int(lower_intersect_y))
+            r = 10
+            x_mid_layer.circle(upper_marker, r, alpha=128, filled=True, color=Color.RED)
+            x_mid_layer.circle(lower_marker, r, alpha=128, filled=True, color=Color.RED)
+
+            result.addDrawingLayer(upper_layer)
+            result.addDrawingLayer(lower_layer)
+            result.addDrawingLayer(x_mid_layer)
+        except:
+            print "Incomplete line data!, is the filament in place?"
 
         result.show()
 
