@@ -63,20 +63,15 @@ def getXSection(width, height, x_posn):
         xSection.append(sum(current_pixel))
     return xSection
 
-#Can replace with a more complex function of x-section if necessary
-def getWidth(xSection, pixel_threshold, bg):
+def getEdges(xSection):
     edges = []
     for i, p in enumerate(xSection):
-        if p > pixel_threshold:
+        if p:
             edges.append(i)
     try:
-        width = max(edges) - min(edges)
-        return (width, min(edges), max(edges))
+        return(min(edges), max(edges))
     except:
-        return (0, 0, 0)
-
-#def getEdges(xSection, pixel_threshold, bg):
-
+        return(0,0)
 
 #Serial functions
 def sendMessage(serial_connection, message):
@@ -132,25 +127,41 @@ if ARDUINO:
 while True:
     try:
         img = cam.getImage()
+        #edge detect
         output = img.edges(t1=pixel_threshold, t2=4*pixel_threshold)
+
+        #split screen
         result = halfsies(img,output)
 
+        #find the edges
         upper_edge = []
         lower_edge = []
         
         for x in range(0,img.width):
             xSection = output.getVertScanlineGray(x)
-#            xSection = getXSection(output.width,output.height,x)
-            width_data = getWidth(xSection, pixel_threshold, bg)
+            edge_data = getEdges(xSection)
+            
+            if edge_data[0] and edge_data[1]:
+                upper_edge.append(edge_data[0])
+                lower_edge.append(edge_data[1])
 
-            upper_edge.append(width_data[1])
-            lower_edge.append(width_data[2])
-
-        upper_line = polyfit(range(0,img.width), upper_edge, 1)
-        lower_line = polyfit(range(0,img.width), lower_edge, 1)
+        #fit the edge data
+        upper_line = polyfit(range(0,len(upper_edge)), upper_edge, 1)
+        lower_line = polyfit(range(0,len(lower_edge)), lower_edge, 1)
+        #find the filament cross section
         xs_slope = -2/(upper_line[0] + lower_line[0])
         xs_offset = img.height/2 - xs_slope*img.width/2
 
+        #calculate the points of intersection of edges and filament cross section
+        upper_intersect_x = (upper_line[1] - xs_offset)/(xs_slope - upper_line[0])
+        upper_intersect_y = xs_slope*upper_intersect_x + xs_offset
+        lower_intersect_x = (lower_line[1] - xs_offset)/(xs_slope - lower_line[0])
+        lower_intersect_y = xs_slope*lower_intersect_x + xs_offset
+
+        #calculate width of filament
+        width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
+
+        #Draw the fit lines and intersect markers
         upper_layer = DrawingLayer((img.width, img.height))
         lower_layer = DrawingLayer((img.width, img.height))
         x_mid_layer = DrawingLayer((img.width, img.height))
@@ -159,17 +170,7 @@ while True:
         upper_stop = upper_line[0]*img.width + upper_line[1] 
         lower_start = lower_line[1]
         lower_stop = lower_line[0]*img.width + lower_line[1] 
-
         xSect_stop = xs_slope*img.width + xs_offset
-        
-        #calculate the points of intersection of edges and perpendicular
-        upper_intersect_x = (upper_line[1] - xs_offset)/(xs_slope - upper_line[0])
-        upper_intersect_y = xs_slope*upper_intersect_x + xs_offset
-        lower_intersect_x = (lower_line[1] - xs_offset)/(xs_slope - lower_line[0])
-        lower_intersect_y = xs_slope*lower_intersect_x + xs_offset
-
-        #calculate width
-        width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
 
         upper_layer.line((0,upper_start), (img.width, upper_stop), alpha=128, width=1, color=Color.RED)
         lower_layer.line((0,lower_start), (img.width, lower_stop), alpha=128, width=1, color=Color.RED)
@@ -187,8 +188,6 @@ while True:
 
         result.show()
 
-        #NAIVE:
-#        width = abs(upper_line[1] - lower_line[1])
         #PID calculations
         error = width - set_point
         P = Kp*error
