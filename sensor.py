@@ -133,98 +133,86 @@ while True:
     try:
         img = cam.getImage()
         output = img.edges(t1=pixel_threshold, t2=4*pixel_threshold)
-        lines = output.findLines()
-        c = []
-        for line in lines:
-            c.append(line.coordinates()[1])
-        upper_n = c.index(max(c))
-        lower_n = c.index(min(c))
-        ul = lines[upper_n]
-        ll = lines[lower_n]
-
-#        lines.draw(color = (255,0,0), width = 1)
-#        output.addDrawingLayer(lines)
-#        output.show()
         result = halfsies(img,output)
 
-#         upper_edge = []
-#         lower_edge = []
+        upper_edge = []
+        lower_edge = []
         
-#         for x in range(0,img.width):
-#             xSection = output.getVertScanlineGray(x)
-# #            xSection = getXSection(output.width,output.height,x)
-#             width_data = getWidth(xSection, pixel_threshold, bg)
+        for x in range(0,img.width):
+            xSection = output.getVertScanlineGray(x)
+#            xSection = getXSection(output.width,output.height,x)
+            width_data = getWidth(xSection, pixel_threshold, bg)
 
-#             upper_edge.append(width_data[1])
-#             lower_edge.append(width_data[2])
+            upper_edge.append(width_data[1])
+            lower_edge.append(width_data[2])
 
-#         upper_line = polyfit(range(0,img.width), upper_edge, 1)
-#         lower_line = polyfit(range(0,img.width), lower_edge, 1)
-#         xs_slope = -2/(upper_line[0] + lower_line[0])
-#         xs_offset = img.height/2 - xs_slope*img.width/2
+        upper_line = polyfit(range(0,img.width), upper_edge, 1)
+        lower_line = polyfit(range(0,img.width), lower_edge, 1)
+        xs_slope = -2/(upper_line[0] + lower_line[0])
+        xs_offset = img.height/2 - xs_slope*img.width/2
 
-#         upper_layer = DrawingLayer((img.width, img.height))
-#         lower_layer = DrawingLayer((img.width, img.height))
-#         x_mid_layer = DrawingLayer((img.width, img.height))
+        upper_layer = DrawingLayer((img.width, img.height))
+        lower_layer = DrawingLayer((img.width, img.height))
+        x_mid_layer = DrawingLayer((img.width, img.height))
 
-#         upper_start = upper_line[1]
-#         upper_stop = upper_line[0]*img.width + upper_line[1] 
-#         lower_start = lower_line[1]
-#         lower_stop = lower_line[0]*img.width + lower_line[1] 
+        upper_start = upper_line[1]
+        upper_stop = upper_line[0]*img.width + upper_line[1] 
+        lower_start = lower_line[1]
+        lower_stop = lower_line[0]*img.width + lower_line[1] 
 
-#         xSect_stop = xs_slope*img.width + xs_offset
+        xSect_stop = xs_slope*img.width + xs_offset
         
-#         #calculate the points of intersection of edges and perpendicular
-#         upper_intersect_x = (upper_line[1] - xs_offset)/(xs_slope - upper_line[0])
-#         upper_intersect_y = xs_slope*upper_intersect_x + xs_offset
-#         lower_intersect_x = (lower_line[1] - xs_offset)/(xs_slope - lower_line[0])
-#         lower_intersect_y = xs_slope*lower_intersect_x + xs_offset
+        #calculate the points of intersection of edges and perpendicular
+        upper_intersect_x = (upper_line[1] - xs_offset)/(xs_slope - upper_line[0])
+        upper_intersect_y = xs_slope*upper_intersect_x + xs_offset
+        lower_intersect_x = (lower_line[1] - xs_offset)/(xs_slope - lower_line[0])
+        lower_intersect_y = xs_slope*lower_intersect_x + xs_offset
 
-#         #calculate width
-#         width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
+        #calculate width
+        width = ((upper_intersect_y - lower_intersect_y)**2 + (upper_intersect_x - lower_intersect_x)**2)**0.5
 
-#         upper_layer.line((0,upper_start), (img.width, upper_stop), alpha=128, width=1, color=Color.RED)
-#         lower_layer.line((0,lower_start), (img.width, lower_stop), alpha=128, width=1, color=Color.RED)
-#         x_mid_layer.line((0, xs_offset), (img.width, xSect_stop), alpha=128, width=1, color=Color.RED)
+        upper_layer.line((0,upper_start), (img.width, upper_stop), alpha=128, width=1, color=Color.RED)
+        lower_layer.line((0,lower_start), (img.width, lower_stop), alpha=128, width=1, color=Color.RED)
+        x_mid_layer.line((0, xs_offset), (img.width, xSect_stop), alpha=128, width=1, color=Color.RED)
 
-#         upper_marker = (int(upper_intersect_x),int(upper_intersect_y))
-#         lower_marker = (int(lower_intersect_x),int(lower_intersect_y))
-#         r = 10
-#         x_mid_layer.circle(upper_marker, r, alpha=128, filled=True, color=Color.RED)
-#         x_mid_layer.circle(lower_marker, r, alpha=128, filled=True, color=Color.RED)
+        upper_marker = (int(upper_intersect_x),int(upper_intersect_y))
+        lower_marker = (int(lower_intersect_x),int(lower_intersect_y))
+        r = 10
+        x_mid_layer.circle(upper_marker, r, alpha=128, filled=True, color=Color.RED)
+        x_mid_layer.circle(lower_marker, r, alpha=128, filled=True, color=Color.RED)
 
-#         result.addDrawingLayer(upper_layer)
-#         result.addDrawingLayer(lower_layer)
-#         result.addDrawingLayer(x_mid_layer)
+        result.addDrawingLayer(upper_layer)
+        result.addDrawingLayer(lower_layer)
+        result.addDrawingLayer(x_mid_layer)
 
-#         result.show()
+        result.show()
 
-#         #NAIVE:
-# #        width = abs(upper_line[1] - lower_line[1])
-#         #PID calculations
-#         error = width - set_point
-#         P = Kp*error
-#         t = time.time()
-#         dt = t - last_time
-#         last_time = t
-#         I += Ki*error*dt
-#         I = clamp(I, -out_max, out_max)
-#         D = Kd*(error - error_last)/dt
-#         error_last = error
-#         output = combine(int(P + I + D), output_offset, forward)
-#         output = clamp(output, out_min, out_max)
+        #NAIVE:
+#        width = abs(upper_line[1] - lower_line[1])
+        #PID calculations
+        error = width - set_point
+        P = Kp*error
+        t = time.time()
+        dt = t - last_time
+        last_time = t
+        I += Ki*error*dt
+        I = clamp(I, -out_max, out_max)
+        D = Kd*(error - error_last)/dt
+        error_last = error
+        output = combine(int(P + I + D), output_offset, forward)
+        output = clamp(output, out_min, out_max)
 
-#         if ARDUINO:
-#             if (t - last_out) > output_rate:
-#                 sendMessage(connection, str(output))
-#                 last_out = t
+        if ARDUINO:
+            if (t - last_out) > output_rate:
+                sendMessage(connection, str(output))
+                last_out = t
 
-#         print "width: " + str(width)
-#         print "set point: " + str(set_point)
-#         print "error: " + str(error)
-#         print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
-#         print "output: " + str(output)
-#         print "-------------"
+        print "width: " + str(width)
+        print "set point: " + str(set_point)
+        print "error: " + str(error)
+        print "P: %d, I: %d, D: %d" % (int(P) , int(I) , int(D))
+        print "output: " + str(output)
+        print "-------------"
     
        
     except (KeyboardInterrupt, SystemExit):
