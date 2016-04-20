@@ -69,7 +69,7 @@ def getXSection(width, height, x_posn):
 def getEdges(xSection):
     edges = []
     for i, p in enumerate(xSection):
-        if p:
+        if p and (i > 10):
             edges.append(i)
     try:
         return(min(edges), max(edges))
@@ -120,7 +120,7 @@ if PI_CAM:
 #    cam.video_stabilization = False
     cam.exposure_compensation = 0
     #cam.exposure_mode = 'off'
-    cam.shutter_speed = 300
+    cam.shutter_speed = 200
 #    cam.meter_mode = 'average'
 #    cam.awb_mode = 'off'
 #    cam.image_effect = 'none'
@@ -128,7 +128,7 @@ if PI_CAM:
 #    cam.rotation = 90
 #    cam.hflip = False
 #    cam.vflip = False
-    cam.crop = (0.49, 0.49, 0.51, 0.51)
+    cam.crop = (0.5, 0.5, 0.25, 0.25) #(x, y, width, height)
 
 else:
     cam = Camera(-1,prop_map)
@@ -157,7 +157,7 @@ while True:
 #            cam.capture(stream,'jpeg', use_video_port=True)
 	    with parray.PiRGBArray(cam) as output:
                 cam.capture(output, 'rgb', use_video_port=True)
-                img = Image(output.array)
+                img = Image(output.array).rotate(angle = 90, fixed=False).toGray()
         else:
             img = cam.getImage()
 
